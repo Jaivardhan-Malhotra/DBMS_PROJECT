@@ -120,9 +120,16 @@ const validateAssociations = async (matchId, playerId, teamId) => {
     return 'The selected team must participate in the selected match.';
   }
 
-  const [players] = await pool.query('SELECT player_id FROM players WHERE player_id = ?', [playerId]);
+  const [players] = await pool.query(
+    'SELECT player_id, team_id FROM players WHERE player_id = ?',
+    [playerId]
+  );
   if (players.length === 0) {
     return 'The selected player does not exist.';
+  }
+
+  if (Number(players[0].team_id) !== Number(teamId)) {
+    return 'The selected player must be assigned to the selected team.';
   }
 
   return null;

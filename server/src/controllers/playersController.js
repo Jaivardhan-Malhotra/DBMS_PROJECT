@@ -284,21 +284,29 @@ const deletePlayer = async (req, res, next) => {
       });
     }
 
+    const connection = await pool.getConnection();
+    let transactionStarted = false;
     try {
-      await pool.query('DELETE FROM players WHERE player_id = ?', [id]);
-      res.status(200).json({
-        success: true,
-        message: `Player '${existing[0].player_name}' deleted successfully`
-      });
+      await connection.beginTransaction();
+      transactionStarted = true;
+      await connection.query('UPDATE matches SET player_of_match = NULL WHERE player_of_match = ?', [id]);
+      await connection.query('DELETE FROM player_match WHERE player_id = ?', [id]);
+      await connection.query('DELETE FROM players WHERE player_id = ?', [id]);
+      await connection.commit();
+      transactionStarted = false;
     } catch (dbError) {
-      if (dbError.code === 'ER_ROW_IS_REFERENCED_2' || dbError.errno === 1451) {
-        return res.status(409).json({
-          success: false,
-          message: 'Cannot delete player: Player has associated match performances or awards.'
-        });
+      if (transactionStarted) {
+        await connection.rollback();
       }
       throw dbError;
+    } finally {
+      connection.release();
     }
+
+    res.status(200).json({
+      success: true,
+      message: `Player '${existing[0].player_name}' deleted successfully`
+    });
   } catch (error) {
     next(error);
   }

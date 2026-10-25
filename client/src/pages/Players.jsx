@@ -113,8 +113,8 @@ const Players = () => {
     if (!formData.player_name.trim()) errors.player_name = 'Player name is required';
     if (!formData.nationality.trim()) errors.nationality = 'Nationality is required';
     if (!formData.role) errors.role = 'Role is required';
-    if (formData.jersey_no && (formData.jersey_no < 0 || formData.jersey_no > 999)) {
-      errors.jersey_no = 'Jersey number must be 0-999';
+    if (formData.jersey_no && (formData.jersey_no < 0 || formData.jersey_no > 99)) {
+      errors.jersey_no = 'Jersey number must be 0-99';
     }
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -435,7 +435,7 @@ const Players = () => {
               <input
                 type="number"
                 min="0"
-                max="999"
+                max="99"
                 className="form-control"
                 placeholder="e.g. 18"
                 value={formData.jersey_no}

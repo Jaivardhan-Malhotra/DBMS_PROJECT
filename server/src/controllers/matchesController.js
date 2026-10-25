@@ -171,8 +171,8 @@ const createMatch = async (req, res, next) => {
 
     const insertQuery = `
       INSERT INTO matches (
-        season_id, venue_id, team1_id, team2_id, match_date, match_time, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        season_id, venue_id, team1_id, team2_id, match_date, match_time, match_type, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const [result] = await pool.query(insertQuery, [
@@ -182,6 +182,7 @@ const createMatch = async (req, res, next) => {
       team2_id,
       match_date,
       match_time || null,
+      'League',
       status || 'Scheduled'
     ]);
 
@@ -227,6 +228,19 @@ const updateMatch = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'team1_id and team2_id cannot be the same team'
+      });
+    }
+
+    const [unmatchedRecords] = await pool.query(`
+      SELECT id
+      FROM player_match
+      WHERE match_id = ? AND team_id NOT IN (?, ?)
+      LIMIT 1
+    `, [id, finalTeam1, finalTeam2]);
+    if (unmatchedRecords.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: 'Cannot change participating teams while player performance records reference a different team.'
       });
     }
 
@@ -278,21 +292,28 @@ const deleteMatch = async (req, res, next) => {
       });
     }
 
+    const connection = await pool.getConnection();
+    let transactionStarted = false;
     try {
-      await pool.query('DELETE FROM matches WHERE match_id = ?', [id]);
-      res.status(200).json({
-        success: true,
-        message: `Match #${id} deleted successfully`
-      });
+      await connection.beginTransaction();
+      transactionStarted = true;
+      await connection.query('DELETE FROM player_match WHERE match_id = ?', [id]);
+      await connection.query('DELETE FROM matches WHERE match_id = ?', [id]);
+      await connection.commit();
+      transactionStarted = false;
     } catch (dbError) {
-      if (dbError.code === 'ER_ROW_IS_REFERENCED_2' || dbError.errno === 1451) {
-        return res.status(409).json({
-          success: false,
-          message: 'Cannot delete match: Player statistics or other related records reference this match.'
-        });
+      if (transactionStarted) {
+        await connection.rollback();
       }
       throw dbError;
+    } finally {
+      connection.release();
     }
+
+    res.status(200).json({
+      success: true,
+      message: `Match #${id} deleted successfully`
+    });
   } catch (error) {
     next(error);
   }

@@ -110,8 +110,8 @@ const createTeam = async (req, res, next) => {
     const insertQuery = `
       INSERT INTO teams (
         team_name, short_name, city, home_venue_id, coach, 
-        jersey_color, founded_year
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        jersey_color, founded_year, titles_won
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const [result] = await pool.query(insertQuery, [
@@ -121,7 +121,8 @@ const createTeam = async (req, res, next) => {
       home_venue_id || null,
       coach ? coach.trim() : null,
       jersey_color ? jersey_color.trim() : null,
-      founded_year || null
+      founded_year || null,
+      0
     ]);
 
     const [createdRows] = await pool.query('SELECT * FROM teams WHERE team_id = ?', [result.insertId]);
@@ -209,21 +210,34 @@ const deleteTeam = async (req, res, next) => {
       });
     }
 
+    const connection = await pool.getConnection();
+    let transactionStarted = false;
     try {
-      await pool.query('DELETE FROM teams WHERE team_id = ?', [id]);
-      res.status(200).json({
-        success: true,
-        message: `Team '${existing[0].team_name}' deleted successfully`
-      });
+      await connection.beginTransaction();
+      transactionStarted = true;
+      await connection.query('UPDATE players SET team_id = NULL WHERE team_id = ?', [id]);
+      await connection.query('DELETE FROM teams WHERE team_id = ?', [id]);
+      await connection.commit();
+      transactionStarted = false;
     } catch (dbError) {
+      if (transactionStarted) {
+        await connection.rollback();
+      }
       if (dbError.code === 'ER_ROW_IS_REFERENCED_2' || dbError.errno === 1451) {
         return res.status(409).json({
           success: false,
-          message: 'Cannot delete team: The team is currently linked to matches, players, or sponsors. Remove or reassign those associations first.'
+          message: 'Cannot delete team: The team is linked to matches or player performance records. Remove or reassign those associations first.'
         });
       }
       throw dbError;
+    } finally {
+      connection.release();
     }
+
+    res.status(200).json({
+      success: true,
+      message: `Team '${existing[0].team_name}' deleted successfully`
+    });
   } catch (error) {
     next(error);
   }

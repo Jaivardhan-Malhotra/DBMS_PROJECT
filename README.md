@@ -16,7 +16,7 @@ The application exposes exactly these five IPL modules:
 4. **Player Statistics** — view matches, runs, wickets, batting average, and strike rate; manage per-match player records.
 5. **Team Statistics** — view played, won, lost, win percentage, titles, points, and season standings derived from match results.
 
-The existing MySQL schema and its primary/foreign-key relationships are reused; no new tables or database system are introduced.
+The database contains only the six tables used by these modules: `teams`, `players`, `matches`, `player_match`, `seasons`, and `venues`. Match schedule details are exposed through the `v_match_details` view.
 
 ---
 
@@ -78,8 +78,8 @@ ipl-management-system/
 │   ├── .env.example
 │   └── package.json
 ├── database/
-│   ├── schema.sql             # DDL — create all tables
-│   └── seed.sql               # Sample data (10 teams, 50 players, 21 matches...)
+│   ├── schema.sql             # DDL — create the six application tables and match view
+│   └── seed.sql               # Sample data (10 teams, 50 players, 24 matches...)
 ├── docs/
 │   ├── er-to-relational-mapping.md
 └── README.md
@@ -91,23 +91,17 @@ ipl-management-system/
 
 ### Step 1 — Set Up MySQL Database
 
-Open **MySQL Workbench** or the MySQL CLI and run:
+Create an empty database named `ipl_management` in MySQL Workbench (or your preferred database setup tool). Select it before running the scripts; the scripts do not create or select databases.
 
-```sql
--- Option A: MySQL Workbench
--- File > Open SQL Script > select database/schema.sql > Execute (⚡)
--- File > Open SQL Script > select database/seed.sql > Execute (⚡)
-
--- Option B: MySQL CLI (run from project root)
-```
+In MySQL Workbench, select `ipl_management`, then execute `database/schema.sql` followed by `database/seed.sql`.
 
 ```powershell
-# In VS Code terminal (PowerShell), from the project root:
-mysql -u root -p < database\schema.sql
-mysql -u root -p < database\seed.sql
+# Run from the project root after creating the database:
+mysql -u root -p ipl_management < database\schema.sql
+mysql -u root -p ipl_management < database\seed.sql
 ```
 
-This creates the `ipl_management` database using the existing schema and sample data.
+The schema and seed scripts are intended for an empty database.
 
 ---
 
@@ -213,7 +207,7 @@ Base URL: `http://localhost:5000/api`
 
 ## 🗄️ Database Schema Summary
 
-The existing schema contains `teams`, `players`, `matches`, `player_match`, `seasons`, and `venues`, plus legacy tables not exposed as application modules. The five modules reuse these existing tables; `player_match` stores player match figures and references its player, team, and match through foreign keys. The schedule reads match details through the existing `v_match_details` view.
+The schema contains only `teams`, `players`, `matches`, `player_match`, `seasons`, and `venues`. `player_match` stores per-match player figures and references its player, team, and match through foreign keys. `v_match_details` joins matches to their season, venue, teams, winner, and player of the match for schedule queries.
 
 ---
 
@@ -254,22 +248,15 @@ net start MySQL80
 | Players | 50 (5 per team) |
 | Venues | 10 |
 | Seasons | 6 (2019–2024) |
-| Matches | 21 |
+| Matches | 24 |
 
 ---
 
 ## SQL Concepts Used
 
-The implementation uses concepts covered in the supplied SQL and Advanced SQL course materials:
+The schema and seed use the requested table definitions, listed data types and constraints, `INSERT INTO`, and a view built from `SELECT` and joins. The API's create, read, update, and delete operations continue to use the existing application queries.
 
-- Existing table data types, primary keys, foreign keys, and integrity constraints support the modules; the schema was not changed.
-- `INSERT`, `SELECT`, `UPDATE`, and `DELETE` for the five modules.
-- `WHERE`, comparison and logical operators, and joins for filtering and related records.
-- `COUNT`, `SUM`, `GROUP BY`, and subqueries for player and team statistics.
-- The existing view for match schedule details.
-- Existing date and time types support match scheduling.
-
-No schema changes, new tables, or SQL techniques outside those course topics were added.
+`AUTO_INCREMENT` remains on primary keys because the API's create operations use MySQL-generated IDs. Tables removed from the schema include awards, innings, owners, sponsors, and umpires, along with their related data.
 
 ---
 
