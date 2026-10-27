@@ -111,7 +111,7 @@ The schema and seed scripts are intended for an empty database.
 # Navigate to server folder
 cd server
 
-# Copy the example env file
+# Copy the example env file if `server/.env` does not already exist
 copy .env.example .env
 ```
 
@@ -127,6 +127,11 @@ PORT=5000
 NODE_ENV=development
 CORS_ORIGIN=http://localhost:3000
 ```
+
+`server/.env` is ignored by Git, so put your local MySQL username and password there.
+If your MySQL server uses a different host, port, or database name, update `DB_HOST`,
+`DB_PORT`, or `DB_NAME` accordingly. The database name must already exist before you
+run the schema and seed scripts.
 
 ---
 

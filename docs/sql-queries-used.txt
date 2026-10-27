@@ -1,0 +1,467 @@
+IPL MANAGEMENT SYSTEM
+SQL QUERIES USED BY THE PROJECT
+================================
+
+How to read this file
+---------------------
+The question mark (?) is a parameter supplied by the backend with mysql2.
+Do not replace a ? by concatenating user input into SQL. Use prepared
+parameters, as the controllers do.
+
+The examples below are grouped by the operation that uses them. They cover
+the database scripts and the active API controllers. The source file shown
+after each operation is the authoritative implementation.
+
+
+1. DATABASE SETUP QUERIES
+=========================
+
+Create the database:
+
+CREATE DATABASE ipl_management;
+
+Create application tables:
+
+CREATE TABLE venues (...);
+CREATE TABLE seasons (...);
+CREATE TABLE teams (...);
+CREATE TABLE players (...);
+CREATE TABLE matches (...);
+CREATE TABLE player_match (...);
+
+Add the team-captain relationship:
+
+ALTER TABLE teams
+    ADD CONSTRAINT fk_team_captain
+    FOREIGN KEY (captain_id) REFERENCES players(player_id)
+    ON DELETE SET NULL ON UPDATE CASCADE;
+
+Create the match-details view:
+
+CREATE VIEW v_match_details AS
+SELECT
+    m.match_id, m.match_date, m.match_time, m.match_type, m.status,
+    m.win_margin, m.win_type, s.season_year, v.venue_name,
+    v.city AS venue_city, t1.team_name AS team1_name,
+    t1.short_name AS team1_short, t2.team_name AS team2_name,
+    t2.short_name AS team2_short, w.team_name AS winner_name,
+    p.player_name AS player_of_match_name
+FROM matches m
+JOIN seasons s ON m.season_id = s.season_id
+JOIN venues v ON m.venue_id = v.venue_id
+JOIN teams t1 ON m.team1_id = t1.team_id
+JOIN teams t2 ON m.team2_id = t2.team_id
+LEFT JOIN teams w ON m.winner_id = w.team_id
+LEFT JOIN players p ON m.player_of_match = p.player_id;
+
+Used in:
+database/schema.sql
+
+
+2. SEED DATA QUERIES
+====================
+
+Add a venue:
+
+INSERT INTO venues
+    (venue_name, city, country, capacity, pitch_type, established_year)
+VALUES
+    (?, ?, ?, ?, ?, ?);
+
+Add a season:
+
+INSERT INTO seasons
+    (season_year, start_date, end_date, host_country,
+     total_teams, total_matches)
+VALUES
+    (?, ?, ?, ?, ?, ?);
+
+Add a team:
+
+INSERT INTO teams
+    (team_name, short_name, city, home_venue_id, coach,
+     jersey_color, founded_year, titles_won)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?);
+
+Add a player:
+
+INSERT INTO players
+    (player_name, dob, nationality, role, batting_style,
+     bowling_style, team_id, jersey_no, matches_played,
+     runs_scored, wickets_taken, base_price, is_active)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+Example:
+
+INSERT INTO players
+    (player_name, dob, nationality, role, batting_style,
+     bowling_style, team_id, jersey_no, matches_played,
+     runs_scored, wickets_taken, base_price, is_active)
+VALUES
+    ('Example Player', '2000-01-15', 'India', 'Batsman',
+     'Right-Hand', NULL, 1, 99, 0, 0, 0, 500000.00, 1);
+
+Assign a seeded captain:
+
+UPDATE teams
+JOIN players ON players.player_name = ?
+            AND players.team_id = teams.team_id
+SET teams.captain_id = players.player_id
+WHERE teams.short_name = ?;
+
+Add a match:
+
+INSERT INTO matches
+    (season_id, venue_id, team1_id, team2_id, match_date,
+     match_time, match_type, status, winner_id, toss_winner_id,
+     toss_decision, win_margin, win_type, player_of_match)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+Add a player performance record:
+
+INSERT INTO player_match
+    (match_id, player_id, team_id, runs_scored, balls_faced,
+     fours, sixes, wickets_taken, overs_bowled, runs_conceded,
+     catches, stumpings, is_out)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+Used in:
+database/seed.sql
+
+
+3. PLAYER QUERIES
+=================
+
+List players with their teams:
+
+SELECT p.player_id, p.player_name, p.dob, p.nationality, p.role,
+       p.batting_style, p.bowling_style, p.team_id, p.jersey_no,
+       p.matches_played, p.runs_scored, p.wickets_taken,
+       p.base_price, p.is_active, t.team_name, t.short_name,
+       t.jersey_color
+FROM players p
+LEFT JOIN teams t ON p.team_id = t.team_id
+WHERE p.player_name LIKE ?
+ORDER BY p.player_name;
+
+Get one player:
+
+SELECT p.*, t.team_name, t.short_name, t.jersey_color
+FROM players p
+LEFT JOIN teams t ON p.team_id = t.team_id
+WHERE p.player_id = ?;
+
+Check a player's team before adding or changing the player:
+
+SELECT team_id
+FROM teams
+WHERE team_id = ?;
+
+Add a new player from the API:
+
+INSERT INTO players
+    (player_name, dob, nationality, role, batting_style,
+     bowling_style, team_id, jersey_no, is_active)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+Return the newly added player:
+
+SELECT p.player_id, p.player_name, p.dob, p.nationality, p.role,
+       p.batting_style, p.bowling_style, p.team_id, p.jersey_no,
+       p.is_active, t.team_name, t.short_name, t.jersey_color
+FROM players p
+LEFT JOIN teams t ON p.team_id = t.team_id
+WHERE p.player_id = ?;
+
+Update a player:
+
+UPDATE players
+SET player_name = ?, dob = ?, nationality = ?, role = ?,
+    batting_style = ?, bowling_style = ?, team_id = ?,
+    jersey_no = ?, is_active = ?
+WHERE player_id = ?;
+
+Delete a player safely:
+
+UPDATE matches
+SET player_of_match = NULL
+WHERE player_of_match = ?;
+
+DELETE FROM player_match
+WHERE player_id = ?;
+
+DELETE FROM players
+WHERE player_id = ?;
+
+Used in:
+server/src/controllers/playersController.js
+
+
+4. TEAM QUERIES
+===============
+
+List teams:
+
+SELECT t.*, v.venue_name, v.city AS venue_city,
+       p.player_name AS captain_name
+FROM teams t
+LEFT JOIN venues v ON t.home_venue_id = v.venue_id
+LEFT JOIN players p ON t.captain_id = p.player_id
+WHERE t.team_name LIKE ? OR t.short_name LIKE ? OR t.city LIKE ?
+ORDER BY t.team_name;
+
+Get one team:
+
+SELECT t.*, v.venue_name, v.city AS venue_city,
+       p.player_name AS captain_name
+FROM teams t
+LEFT JOIN venues v ON t.home_venue_id = v.venue_id
+LEFT JOIN players p ON t.captain_id = p.player_id
+WHERE t.team_id = ?;
+
+Add a team:
+
+INSERT INTO teams
+    (team_name, short_name, city, home_venue_id, coach,
+     jersey_color, founded_year, titles_won)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?);
+
+Update a team:
+
+UPDATE teams
+SET team_name = ?, short_name = ?, city = ?, home_venue_id = ?,
+    coach = ?, jersey_color = ?, founded_year = ?, titles_won = ?,
+    captain_id = ?
+WHERE team_id = ?;
+
+Get a team's players:
+
+SELECT p.player_id, p.player_name, p.role, p.team_id
+FROM players p
+WHERE p.team_id = ?
+ORDER BY p.role, p.player_name;
+
+Used in:
+server/src/controllers/teamsController.js
+
+
+5. MATCH QUERIES
+================
+
+List matches:
+
+SELECT v.*, m.season_id, m.venue_id, m.team1_id, m.team2_id
+FROM v_match_details v
+JOIN matches m ON v.match_id = m.match_id
+WHERE m.season_id = ? AND m.status = ?
+ORDER BY v.match_date DESC, v.match_id DESC;
+
+Check references before adding a match:
+
+SELECT season_id FROM seasons WHERE season_id = ?;
+SELECT venue_id FROM venues WHERE venue_id = ?;
+SELECT team_id FROM teams WHERE team_id = ?;
+
+Add a new match:
+
+INSERT INTO matches
+    (season_id, venue_id, team1_id, team2_id,
+     match_date, match_time, match_type, status)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?);
+
+Update a match:
+
+UPDATE matches
+SET season_id = ?, venue_id = ?, team1_id = ?, team2_id = ?,
+    match_date = ?, match_time = ?, status = ?
+WHERE match_id = ?;
+
+Delete a match and its player records:
+
+DELETE FROM player_match
+WHERE match_id = ?;
+
+DELETE FROM matches
+WHERE match_id = ?;
+
+Used in:
+server/src/controllers/matchesController.js
+
+
+6. PLAYER STATISTICS QUERIES
+============================
+
+Get player statistics:
+
+SELECT p.player_id, p.player_name, t.team_name,
+       COUNT(pm.id) AS records_count,
+       COUNT(DISTINCT pm.match_id) AS matches_count,
+       COALESCE(SUM(pm.runs_scored), 0) AS total_runs,
+       COALESCE(SUM(pm.wickets_taken), 0) AS total_wickets,
+       COALESCE(SUM(pm.balls_faced), 0) AS total_balls,
+       p.matches_played, p.runs_scored, p.wickets_taken
+FROM players p
+LEFT JOIN teams t ON t.team_id = p.team_id
+LEFT JOIN player_match pm ON pm.player_id = p.player_id
+GROUP BY p.player_id, p.player_name, t.team_name,
+         p.matches_played, p.runs_scored, p.wickets_taken;
+
+List match records:
+
+SELECT pm.*, p.player_name, t.team_name, m.match_date,
+       t1.team_name AS team1_name, t2.team_name AS team2_name
+FROM player_match pm
+JOIN players p ON p.player_id = pm.player_id
+JOIN teams t ON t.team_id = pm.team_id
+JOIN matches m ON m.match_id = pm.match_id
+JOIN teams t1 ON t1.team_id = m.team1_id
+JOIN teams t2 ON t2.team_id = m.team2_id
+ORDER BY m.match_date DESC, pm.id DESC;
+
+Add a match record:
+
+INSERT INTO player_match
+    (match_id, player_id, team_id, runs_scored, balls_faced,
+     wickets_taken, is_out)
+VALUES
+    (?, ?, ?, ?, ?, ?, ?);
+
+Update a match record:
+
+UPDATE player_match
+SET match_id = ?, player_id = ?, team_id = ?,
+    runs_scored = ?, balls_faced = ?, wickets_taken = ?,
+    is_out = ?
+WHERE id = ?;
+
+Delete a match record:
+
+DELETE FROM player_match
+WHERE id = ?;
+
+Used in:
+server/src/controllers/playerStatisticsController.js
+
+
+7. SEASON, VENUE, AND STANDING QUERIES
+======================================
+
+List seasons:
+
+SELECT season_id, season_year
+FROM seasons
+ORDER BY season_year DESC;
+
+List venues:
+
+SELECT venue_id, venue_name, city
+FROM venues
+ORDER BY venue_name;
+
+Select the requested or latest season:
+
+SELECT season_id, season_year
+FROM seasons
+WHERE season_id = ?;
+
+SELECT season_id, season_year
+FROM seasons
+WHERE season_year = (SELECT MAX(season_year) FROM seasons);
+
+Calculate team standings for a season:
+
+SELECT t.team_id, t.team_name,
+       (SELECT COUNT(*) FROM matches m
+        WHERE m.season_id = ? AND
+              (m.team1_id = t.team_id OR m.team2_id = t.team_id) AND
+              m.status = 'Completed') AS played,
+       (SELECT COUNT(*) FROM matches m
+        WHERE m.season_id = ? AND m.winner_id = t.team_id) AS wins,
+       (SELECT COUNT(*) FROM matches m
+        WHERE m.season_id = ? AND
+              (m.team1_id = t.team_id OR m.team2_id = t.team_id) AND
+              m.status = 'No Result') AS no_results
+FROM teams t
+ORDER BY t.team_name;
+
+Used in:
+server/src/controllers/seasonsController.js
+server/src/controllers/venuesController.js
+server/src/controllers/teamStatisticsController.js
+
+
+8. TEAM DATA MIGRATION QUERIES
+==============================
+
+Check required tables:
+
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = DATABASE()
+  AND table_name IN ('teams', 'players');
+
+Check whether the captain column exists:
+
+SELECT column_name
+FROM information_schema.columns
+WHERE table_schema = DATABASE()
+  AND table_name = 'teams'
+  AND column_name = 'captain_id';
+
+Add the captain column if needed:
+
+ALTER TABLE teams
+ADD COLUMN captain_id INT NULL AFTER coach;
+
+Read team colors:
+
+SELECT team_id, jersey_color
+FROM teams;
+
+Update a team's normalized jersey color:
+
+UPDATE teams
+SET jersey_color = ?
+WHERE team_id = ?;
+
+Used in:
+server/scripts/migrateTeamData.js
+
+
+9. OTHER CONTROLLER QUERY GROUPS
+================================
+
+The following controllers contain additional SELECT, INSERT, UPDATE, and
+DELETE queries for their respective features:
+
+Dashboard:
+server/src/controllers/dashboardController.js
+
+Awards and player awards:
+server/src/controllers/awardsController.js
+
+Innings and score data:
+server/src/controllers/inningsController.js
+
+Owners:
+server/src/controllers/ownersController.js
+
+Sponsors:
+server/src/controllers/sponsorsController.js
+
+Umpires:
+server/src/controllers/umpiresController.js
+
+Reports:
+server/src/controllers/reportsController.js
+
+These controller query groups are retained in the codebase, but their routes
+are not currently mounted by server/src/routes/index.js. The active routes
+and their exact query families are documented in sections 3 through 7.
