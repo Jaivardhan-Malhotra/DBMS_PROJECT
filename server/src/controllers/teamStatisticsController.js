@@ -36,6 +36,7 @@ const getTeamStatistics = async (req, res, next) => {
         t.team_name,
         t.short_name,
         t.city,
+        t.jersey_color,
         t.titles_won,
         (SELECT COUNT(*)
          FROM matches m

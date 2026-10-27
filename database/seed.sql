@@ -34,16 +34,16 @@ INSERT INTO seasons (season_year, start_date, end_date, host_country, total_team
 -- TEAMS (Real coaches, jersey colors, titles won as of 2024)
 -- =============================================================
 INSERT INTO teams (team_name, short_name, city, home_venue_id, coach, jersey_color, founded_year, titles_won) VALUES
-('Mumbai Indians',              'MI',   'Mumbai',    1,  'Mark Boucher',       'Blue & Gold',        2008, 5),
-('Chennai Super Kings',         'CSK',  'Chennai',   4,  'Stephen Fleming',    'Yellow & Blue',      2008, 5),
-('Royal Challengers Bengaluru', 'RCB',  'Bangalore', 2,  'Andy Flower',        'Red & Black',        2008, 0),
-('Kolkata Knight Riders',       'KKR',  'Kolkata',   3,  'Chandrakant Pandit', 'Purple & Gold',      2008, 3),
-('Rajasthan Royals',            'RR',   'Jaipur',      6,  'Kumar Sangakkara',   'Pink & Blue',        2008, 1),
-('Sunrisers Hyderabad',         'SRH',  'Hyderabad', 5,  'Daniel Vettori',     'Orange & Black',     2012, 1),
-('Punjab Kings',                'PBKS', 'Mohali',    7,  'Ricky Ponting',      'Red & Silver',       2008, 0),
-('Delhi Capitals',              'DC',   'Delhi',     8,  'Ricky Ponting',      'Blue & Red',         2008, 0),
-('Gujarat Titans',              'GT',   'Ahmedabad', 10, 'Ashish Nehra',       'Blue & Navy',        2022, 1),
-('Lucknow Super Giants',        'LSG',  'Lucknow',   9,  'Justin Langer',      'Teal & Gold',        2022, 0);
+('Mumbai Indians',              'MI',   'Mumbai',    1,  'Mark Boucher',       'Blue',        2008, 5),
+('Chennai Super Kings',         'CSK',  'Chennai',   4,  'Stephen Fleming',    'Yellow',      2008, 5),
+('Royal Challengers Bengaluru', 'RCB',  'Bangalore', 2,  'Andy Flower',        'Red',          2008, 0),
+('Kolkata Knight Riders',       'KKR',  'Kolkata',   3,  'Chandrakant Pandit', 'Purple',      2008, 3),
+('Rajasthan Royals',            'RR',   'Jaipur',   6,  'Kumar Sangakkara',   'Pink',         2008, 1),
+('Sunrisers Hyderabad',         'SRH',  'Hyderabad', 5,  'Daniel Vettori',     'Orange',      2012, 1),
+('Punjab Kings',                'PBKS', 'Mohali',    7,  'Ricky Ponting',      'Red',          2008, 0),
+('Delhi Capitals',              'DC',   'Delhi',     8,  'Ricky Ponting',      'Blue',         2008, 0),
+('Gujarat Titans',              'GT',   'Ahmedabad', 10, 'Ashish Nehra',       'Navy',         2022, 1),
+('Lucknow Super Giants',        'LSG',  'Lucknow',    9, 'Justin Langer',      'Teal',         2022, 0);
 
 -- =============================================================
 -- PLAYERS (Career stats accurate as of IPL 2024)
@@ -109,6 +109,23 @@ INSERT INTO players (player_name, dob, nationality, role, batting_style, bowling
 ('Marcus Stoinis',    '1989-08-16', 'Australian',   'All-Rounder',   'Right-Hand', 'Right-Arm Medium',   10,  9,  98, 2196,  38, 11.00, 1),
 ('Ravi Bishnoi',      '2000-09-05', 'Indian',       'Bowler',        'Right-Hand', 'Leg Break',          10, 30,  72,  260,  86,  4.00, 1),
 ('Mohsin Khan',       '2000-07-10', 'Indian',       'Bowler',        'Left-Hand',  'Left-Arm Fast',      10, 98,  43,  120,  47,  0.20, 1);
+
+UPDATE teams t
+JOIN players p
+  ON p.team_id = t.team_id
+  AND p.player_name = CASE t.short_name
+    WHEN 'MI' THEN 'Rohit Sharma'
+    WHEN 'CSK' THEN 'Ruturaj Gaikwad'
+    WHEN 'RCB' THEN 'Faf du Plessis'
+    WHEN 'KKR' THEN 'Shreyas Iyer'
+    WHEN 'RR' THEN 'Sanju Samson'
+    WHEN 'SRH' THEN 'Pat Cummins'
+    WHEN 'PBKS' THEN 'Shikhar Dhawan'
+    WHEN 'DC' THEN 'Rishabh Pant'
+    WHEN 'GT' THEN 'Shubman Gill'
+    WHEN 'LSG' THEN 'KL Rahul'
+  END
+SET t.captain_id = p.player_id;
 
 -- =============================================================
 -- MATCHES (Real IPL 2023 & 2024 results)

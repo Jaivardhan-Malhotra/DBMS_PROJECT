@@ -26,10 +26,22 @@ const createPlayerValidation = [
     .isIn(VALID_BATTING_STYLES)
     .withMessage(`batting_style must be one of: ${VALID_BATTING_STYLES.join(', ')}`),
   body('nationality')
-    .optional()
     .trim()
+    .notEmpty()
+    .withMessage('nationality is required')
     .isLength({ max: 100 })
     .withMessage('nationality cannot exceed 100 characters'),
+  body('bowling_style')
+    .optional({ nullable: true })
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('bowling_style cannot exceed 100 characters'),
+  body('dob')
+    .optional({ nullable: true })
+    .matches(/^\d{4}-\d{2}-\d{2}$/)
+    .withMessage('dob must use YYYY-MM-DD format')
+    .isISO8601({ strict: true })
+    .withMessage('dob must be a valid date'),
   body('team_id')
     .optional({ nullable: true })
     .isInt({ min: 1 })
@@ -66,8 +78,21 @@ const updatePlayerValidation = [
   body('nationality')
     .optional()
     .trim()
+    .notEmpty()
+    .withMessage('nationality cannot be empty')
     .isLength({ max: 100 })
     .withMessage('nationality cannot exceed 100 characters'),
+  body('bowling_style')
+    .optional({ nullable: true })
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('bowling_style cannot exceed 100 characters'),
+  body('dob')
+    .optional({ nullable: true })
+    .matches(/^\d{4}-\d{2}-\d{2}$/)
+    .withMessage('dob must use YYYY-MM-DD format')
+    .isISO8601({ strict: true })
+    .withMessage('dob must be a valid date'),
   body('team_id')
     .optional({ nullable: true })
     .isInt({ min: 1 })
@@ -84,9 +109,19 @@ const updatePlayerValidation = [
 
 // Routes
 router.get('/', playersController.getAllPlayers);
-router.get('/:id', playersController.getPlayerById);
+router.get(
+  '/:id',
+  param('id').isInt({ min: 1 }).withMessage('Invalid player ID parameter'),
+  validate,
+  playersController.getPlayerById
+);
 router.post('/', createPlayerValidation, validate, playersController.createPlayer);
 router.put('/:id', updatePlayerValidation, validate, playersController.updatePlayer);
-router.delete('/:id', playersController.deletePlayer);
+router.delete(
+  '/:id',
+  param('id').isInt({ min: 1 }).withMessage('Invalid player ID parameter'),
+  validate,
+  playersController.deletePlayer
+);
 
 module.exports = router;

@@ -2,8 +2,13 @@ const express = require('express');
 const { body, param } = require('express-validator');
 const teamsController = require('../controllers/teamsController');
 const { validate } = require('../middleware/validate');
+const jerseyColors = require('../../../database/team-colors.json');
 
 const router = express.Router();
+const validJerseyColors = jerseyColors.map(({ name }) => name);
+const teamIdValidation = param('id')
+  .isInt({ min: 1 })
+  .withMessage('Invalid team ID parameter');
 
 // Validation chains
 const createTeamValidation = [
@@ -25,6 +30,15 @@ const createTeamValidation = [
     .withMessage('city is required')
     .isLength({ max: 100 })
     .withMessage('city cannot exceed 100 characters'),
+  body('coach')
+    .optional({ nullable: true })
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('coach cannot exceed 100 characters'),
+  body('jersey_color')
+    .notEmpty()
+    .isIn(validJerseyColors)
+    .withMessage(`jersey_color must be one of: ${validJerseyColors.join(', ')}`),
   body('home_venue_id')
     .optional({ nullable: true })
     .isInt({ min: 1 })
@@ -32,7 +46,11 @@ const createTeamValidation = [
   body('founded_year')
     .optional({ nullable: true })
     .isInt({ min: 1900, max: 2100 })
-    .withMessage('founded_year must be a valid year')
+    .withMessage('founded_year must be a valid year'),
+  body('titles_won')
+    .optional()
+    .isInt({ min: 0, max: 255 })
+    .withMessage('titles_won must be a whole number between 0 and 255')
 ];
 
 const updateTeamValidation = [
@@ -60,6 +78,19 @@ const updateTeamValidation = [
     .withMessage('city cannot be empty')
     .isLength({ max: 100 })
     .withMessage('city cannot exceed 100 characters'),
+  body('coach')
+    .optional({ nullable: true })
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('coach cannot exceed 100 characters'),
+  body('jersey_color')
+    .optional()
+    .isIn(validJerseyColors)
+    .withMessage(`jersey_color must be one of: ${validJerseyColors.join(', ')}`),
+  body('captain_id')
+    .optional({ nullable: true })
+    .isInt({ min: 1 })
+    .withMessage('captain_id must be a positive integer'),
   body('home_venue_id')
     .optional({ nullable: true })
     .isInt({ min: 1 })
@@ -67,15 +98,19 @@ const updateTeamValidation = [
   body('founded_year')
     .optional({ nullable: true })
     .isInt({ min: 1900, max: 2100 })
-    .withMessage('founded_year must be a valid year')
+    .withMessage('founded_year must be a valid year'),
+  body('titles_won')
+    .optional()
+    .isInt({ min: 0, max: 255 })
+    .withMessage('titles_won must be a whole number between 0 and 255')
 ];
 
 // Routes
 router.get('/', teamsController.getAllTeams);
-router.get('/:id', teamsController.getTeamById);
-router.get('/:id/players', teamsController.getTeamPlayers);
+router.get('/:id', teamIdValidation, validate, teamsController.getTeamById);
+router.get('/:id/players', teamIdValidation, validate, teamsController.getTeamPlayers);
 router.post('/', createTeamValidation, validate, teamsController.createTeam);
 router.put('/:id', updateTeamValidation, validate, teamsController.updateTeam);
-router.delete('/:id', teamsController.deleteTeam);
+router.delete('/:id', teamIdValidation, validate, teamsController.deleteTeam);
 
 module.exports = router;

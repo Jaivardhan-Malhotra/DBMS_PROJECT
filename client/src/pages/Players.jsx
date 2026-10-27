@@ -15,6 +15,7 @@ import SearchFilter from '../components/SearchFilter';
 import FormField from '../components/FormField';
 import Badge from '../components/Badge';
 import Pagination from '../components/Pagination';
+import { getJerseyColorHex } from '../constants/teamColors';
 
 const initialPlayerForm = {
   player_name: '',
@@ -111,9 +112,18 @@ const Players = () => {
   const validateForm = () => {
     const errors = {};
     if (!formData.player_name.trim()) errors.player_name = 'Player name is required';
+    else if (formData.player_name.trim().length > 150) errors.player_name = 'Player name cannot exceed 150 characters';
     if (!formData.nationality.trim()) errors.nationality = 'Nationality is required';
+    else if (formData.nationality.trim().length > 100) errors.nationality = 'Nationality cannot exceed 100 characters';
     if (!formData.role) errors.role = 'Role is required';
-    if (formData.jersey_no && (formData.jersey_no < 0 || formData.jersey_no > 99)) {
+    if (formData.bowling_style.trim().length > 100) {
+      errors.bowling_style = 'Bowling style cannot exceed 100 characters';
+    }
+    if (formData.jersey_no !== '' && (
+      !Number.isInteger(Number(formData.jersey_no))
+      || Number(formData.jersey_no) < 0
+      || Number(formData.jersey_no) > 99
+    )) {
       errors.jersey_no = 'Jersey number must be 0-99';
     }
     setFormErrors(errors);
@@ -198,7 +208,7 @@ const Players = () => {
       label: 'Player',
       render: (_, row) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {row.jersey_no && (
+          {row.jersey_no !== null && row.jersey_no !== undefined && (
             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>
               #{row.jersey_no}
             </span>
@@ -222,10 +232,10 @@ const Players = () => {
       key: 'team_name',
       label: 'Franchise',
       render: (_, row) => {
-        const teamObj = teams.find((t) => t.team_id === row.team_id);
+        const teamObj = teams.find((t) => String(t.team_id) === String(row.team_id));
         const name = row.team_short || row.team_name || teamObj?.short_name || 'Free Agent';
         return (
-          <span style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>
+          <span style={{ fontWeight: 500, color: getJerseyColorHex(teamObj?.jersey_color, 'var(--text-secondary)') }}>
             {name}
           </span>
         );
@@ -419,7 +429,7 @@ const Players = () => {
                 <option value="Left-Hand">Left-Hand</option>
               </select>
             </FormField>
-            <FormField label="Bowling Style">
+            <FormField label="Bowling Style" error={formErrors.bowling_style}>
               <input
                 type="text"
                 className="form-control"
@@ -514,7 +524,7 @@ const Players = () => {
                   fontSize: '1.2rem',
                 }}
               >
-                {selectedPlayer.jersey_no || '#'}
+                {selectedPlayer.jersey_no ?? '#'}
               </div>
               <div>
                 <h4 style={{ fontSize: '1.15rem', fontWeight: 700 }}>{selectedPlayer.player_name}</h4>

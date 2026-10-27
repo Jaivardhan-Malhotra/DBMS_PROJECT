@@ -33,12 +33,17 @@ CREATE TABLE teams (
     city VARCHAR(100) NOT NULL,
     home_venue_id INT,
     coach VARCHAR(100),
+    captain_id INT,
     jersey_color VARCHAR(50),
     founded_year INT,
-    titles_won INT NOT NULL,
+    titles_won TINYINT UNSIGNED NOT NULL DEFAULT 0,
     FOREIGN KEY (home_venue_id) REFERENCES venues(venue_id),
     CHECK (founded_year IS NULL OR founded_year > 0),
-    CHECK (titles_won >= 0)
+    CHECK (titles_won >= 0),
+    CHECK (jersey_color IS NULL OR jersey_color IN (
+        'Blue', 'Yellow', 'Red', 'Purple', 'Pink', 'Orange',
+        'Teal', 'Green', 'Gold', 'Silver', 'Navy', 'White'
+    ))
 );
 
 CREATE TABLE players (
@@ -98,6 +103,11 @@ CREATE TABLE matches (
     CHECK (win_type IS NULL OR win_type IN ('Runs', 'Wickets', 'Super Over', 'No Result'))
 );
 
+ALTER TABLE teams
+    ADD CONSTRAINT fk_team_captain
+    FOREIGN KEY (captain_id) REFERENCES players(player_id)
+    ON DELETE SET NULL ON UPDATE CASCADE;
+
 CREATE TABLE player_match (
     id INT AUTO_INCREMENT PRIMARY KEY,
     match_id INT NOT NULL,
@@ -154,3 +164,6 @@ JOIN teams t1 ON m.team1_id = t1.team_id
 JOIN teams t2 ON m.team2_id = t2.team_id
 LEFT JOIN teams w ON m.winner_id = w.team_id
 LEFT JOIN players p ON m.player_of_match = p.player_id;
+
+USE ipl_management;
+SELECT * FROM teams ORDER BY team_id DESC;

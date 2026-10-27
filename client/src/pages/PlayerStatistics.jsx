@@ -13,6 +13,7 @@ import FormField from '../components/FormField';
 import Modal from '../components/Modal';
 import SearchFilter from '../components/SearchFilter';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { getJerseyColorHex } from '../constants/teamColors';
 
 const emptyRecord = {
   match_id: '',
@@ -23,6 +24,12 @@ const emptyRecord = {
   wickets_taken: 0,
   is_out: 0,
 };
+
+const numericFields = [
+  ['runs_scored', 'Runs scored', 65535],
+  ['balls_faced', 'Balls faced', 65535],
+  ['wickets_taken', 'Wickets taken', 255],
+];
 
 const PlayerStatistics = () => {
   const [statistics, setStatistics] = useState([]);
@@ -131,6 +138,14 @@ const PlayerStatistics = () => {
       toast.error('Select a match, participating team, and player.');
       return;
     }
+    const invalidMetric = numericFields.find(([field, , max]) => {
+      const value = Number(formData[field] ?? 0);
+      return !Number.isInteger(value) || value < 0 || value > max;
+    });
+    if (invalidMetric) {
+      toast.error(`${invalidMetric[1]} must be a whole number between 0 and ${invalidMetric[2]}.`);
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = {
@@ -174,7 +189,18 @@ const PlayerStatistics = () => {
 
   const statColumns = [
     { key: 'player_name', label: 'Player', className: 'text-primary' },
-    { key: 'team_name', label: 'Team', render: (value) => value || 'Free Agent' },
+    {
+      key: 'team_name',
+      label: 'Team',
+      render: (value, row) => (
+        <span style={{ color: getJerseyColorHex(
+          teams.find((team) => String(team.team_id) === String(row.team_id))?.jersey_color,
+          'var(--text-secondary)'
+        ) }}>
+          {value || 'Free Agent'}
+        </span>
+      ),
+    },
     { key: 'matches_played', label: 'Matches' },
     { key: 'runs_scored', label: 'Runs' },
     { key: 'wickets_taken', label: 'Wickets' },
@@ -211,7 +237,18 @@ const PlayerStatistics = () => {
       ),
     },
     { key: 'player_name', label: 'Player', className: 'text-primary' },
-    { key: 'team_name', label: 'Team' },
+    {
+      key: 'team_name',
+      label: 'Team',
+      render: (value, row) => (
+        <span style={{ color: getJerseyColorHex(
+          teams.find((team) => String(team.team_id) === String(row.team_id))?.jersey_color,
+          'var(--text-secondary)'
+        ) }}>
+          {value || 'Free Agent'}
+        </span>
+      ),
+    },
     { key: 'runs_scored', label: 'Runs', render: (value, row) => `${value} runs (${row.balls_faced} balls)` },
     { key: 'wickets_taken', label: 'Wickets' },
     {
@@ -228,12 +265,6 @@ const PlayerStatistics = () => {
         </div>
       ),
     },
-  ];
-
-  const numericFields = [
-    ['runs_scored', 'Runs scored', 0],
-    ['balls_faced', 'Balls faced', 0],
-    ['wickets_taken', 'Wickets taken', 0],
   ];
 
   return (
@@ -380,13 +411,14 @@ const PlayerStatistics = () => {
             </FormField>
           </div>
           <div className="form-row">
-            {numericFields.map(([field, label, step]) => (
+            {numericFields.map(([field, label, max]) => (
               <FormField key={field} label={label}>
                 <input
                   className="form-control"
                   type="number"
                   min="0"
-                  step={step}
+                  max={max}
+                  step="1"
                   value={formData[field]}
                   onChange={(event) => setFormData((current) => ({ ...current, [field]: event.target.value }))}
                 />

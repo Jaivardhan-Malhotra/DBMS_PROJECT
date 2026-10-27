@@ -21,6 +21,7 @@ import SearchFilter from '../components/SearchFilter';
 import FormField from '../components/FormField';
 import Badge from '../components/Badge';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { getJerseyColorHex } from '../constants/teamColors';
 import EmptyState from '../components/EmptyState';
 import Pagination from '../components/Pagination';
 
@@ -300,9 +301,9 @@ const Matches = () => {
       ) : (
         <div className="grid-2">
           {paginatedMatches.map((match) => {
-            const team1 = teams.find((t) => t.team_id === match.team1_id);
-            const team2 = teams.find((t) => t.team_id === match.team2_id);
-            const venue = venues.find((v) => v.venue_id === match.venue_id);
+            const team1 = teams.find((t) => String(t.team_id) === String(match.team1_id));
+            const team2 = teams.find((t) => String(t.team_id) === String(match.team2_id));
+            const venue = venues.find((v) => String(v.venue_id) === String(match.venue_id));
             const team1Name = match.team1_short || team1?.short_name || match.team1_name || 'Team 1';
             const team2Name = match.team2_short || team2?.short_name || match.team2_name || 'Team 2';
             const venueTitle = match.venue_name || venue?.venue_name || 'Venue TBA';
@@ -328,21 +329,21 @@ const Matches = () => {
                         width: '10px',
                         height: '10px',
                         borderRadius: '50%',
-                        backgroundColor: team1?.jersey_color || '#3b82f6',
+                        backgroundColor: getJerseyColorHex(team1?.jersey_color),
                         display: 'inline-block',
                       }}
                     />
-                    <span>{team1Name}</span>
+                    <span style={{ color: getJerseyColorHex(team1?.jersey_color) }}>{team1Name}</span>
                   </div>
                   <div className="match-vs">VS</div>
                   <div className="match-team">
-                    <span>{team2Name}</span>
+                    <span style={{ color: getJerseyColorHex(team2?.jersey_color) }}>{team2Name}</span>
                     <span
                       style={{
                         width: '10px',
                         height: '10px',
                         borderRadius: '50%',
-                        backgroundColor: team2?.jersey_color || '#f97316',
+                        backgroundColor: getJerseyColorHex(team2?.jersey_color),
                         display: 'inline-block',
                       }}
                     />

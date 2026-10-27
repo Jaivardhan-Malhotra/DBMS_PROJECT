@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { seasonsAPI, teamStatisticsAPI } from '../services/api';
 import DataTable from '../components/DataTable';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { getJerseyColorHex } from '../constants/teamColors';
 
 const TeamStatistics = () => {
   const [standings, setStandings] = useState([]);
@@ -50,7 +51,7 @@ const TeamStatistics = () => {
       className: 'text-primary',
       render: (value, row) => (
         <div>
-          <strong>{value}</strong>
+          <strong style={{ color: getJerseyColorHex(row.jersey_color) }}>{value}</strong>
           <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>{row.short_name} · {row.city}</div>
         </div>
       ),

@@ -10,13 +10,13 @@ A full-stack web application for managing IPL (Indian Premier League) data — b
 
 The application exposes exactly these five IPL modules:
 
-1. **Teams** — add, view, update, and delete teams.
+1. **Teams** — add, view, update, and delete teams, assign a captain from the team's players, and choose a named jersey color.
 2. **Players in Teams** — manage player details and team assignments.
 3. **Match Schedule** — manage participating teams, season, date, time, venue, and status. Seasons and venues are read-only lookups required by the existing database.
 4. **Player Statistics** — view matches, runs, wickets, batting average, and strike rate; manage per-match player records.
 5. **Team Statistics** — view played, won, lost, win percentage, titles, points, and season standings derived from match results.
 
-The database contains only the six tables used by these modules: `teams`, `players`, `matches`, `player_match`, `seasons`, and `venues`. Match schedule details are exposed through the `v_match_details` view.
+The database contains only the six tables used by these modules: `teams`, `players`, `matches`, `player_match`, `seasons`, and `venues`. A team's optional `captain_id` references a player assigned to that team. Match schedule details are exposed through the `v_match_details` view.
 
 ---
 
@@ -125,7 +125,7 @@ DB_PASSWORD=YOUR_ACTUAL_MYSQL_PASSWORD
 DB_NAME=ipl_management
 PORT=5000
 NODE_ENV=development
-CORS_ORIGIN=http://localhost:5173
+CORS_ORIGIN=http://localhost:3000
 ```
 
 ---
@@ -140,7 +140,20 @@ npm install
 
 ---
 
-### Step 4 — Start the Backend Server
+### Step 4 — Migrate Team Data
+
+Run this once for an existing database (it is safe to rerun). It adds the captain relationship if missing, converts existing jersey colors to the supported named palette, and enforces the palette in MySQL.
+
+```powershell
+# From the server/ directory
+npm run migrate:team-data
+```
+
+New databases created from `schema.sql` and `seed.sql` already have the captain relationship and named jersey colors; running the migration is still safe.
+
+---
+
+### Step 5 — Start the Backend Server
 
 ```powershell
 # Development mode (auto-restart on file changes)
@@ -160,7 +173,7 @@ You should see:
 
 ---
 
-### Step 5 — Install Frontend Dependencies
+### Step 6 — Install Frontend Dependencies
 
 Open a **new terminal tab/window**:
 
@@ -172,14 +185,18 @@ npm install
 
 ---
 
-### Step 6 — Start the Frontend
+### Step 7 — Start the Frontend
 
 ```powershell
 # From the client/ directory
 npm run dev
 ```
 
-Open your browser: **http://localhost:5173**
+Open your browser: **http://localhost:3000**
+
+To assign a captain, first add the player and assign them to a team. Then edit that team and choose the player in **Team Captain**. A player cannot be captain of a different team or be moved to another team until their captain assignment is cleared or changed.
+
+Deleting a team also permanently deletes its linked match fixtures and dependent scorecards, innings, and match-official assignments. Player profiles are retained but become unassigned; optional owner and season champion/runner-up references are cleared, and team sponsorship links are removed. The confirmation dialog lists these effects before deletion.
 
 ---
 
@@ -207,7 +224,7 @@ Base URL: `http://localhost:5000/api`
 
 ## 🗄️ Database Schema Summary
 
-The schema contains only `teams`, `players`, `matches`, `player_match`, `seasons`, and `venues`. `player_match` stores per-match player figures and references its player, team, and match through foreign keys. `v_match_details` joins matches to their season, venue, teams, winner, and player of the match for schedule queries.
+The schema contains only `teams`, `players`, `matches`, `player_match`, `seasons`, and `venues`. Each team may reference one of its players as captain through `teams.captain_id`; jersey colors are stored as names from the shared palette. `player_match` stores per-match player figures and references its player, team, and match through foreign keys. `v_match_details` joins matches to their season, venue, teams, winner, and player of the match for schedule queries.
 
 ---
 

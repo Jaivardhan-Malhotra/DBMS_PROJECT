@@ -2,6 +2,9 @@ const pool = require('../config/database');
 
 const VALID_ROLES = ['Batsman', 'Bowler', 'All-Rounder', 'Wicket-Keeper'];
 const VALID_BATTING_STYLES = ['Right-Hand', 'Left-Hand'];
+const toDatabaseBoolean = (value) => (
+  value === true || value === 1 || value === '1' || value === 'true' ? 1 : 0
+);
 
 /**
  * Controller for Players operations
@@ -147,6 +150,13 @@ const createPlayer = async (req, res, next) => {
       });
     }
 
+    if (team_id !== null) {
+      const [teams] = await pool.query('SELECT team_id FROM teams WHERE team_id = ?', [team_id]);
+      if (teams.length === 0) {
+        return res.status(400).json({ success: false, message: 'The selected team does not exist.' });
+      }
+    }
+
     const insertQuery = `
       INSERT INTO players (
         player_name, dob, nationality, role, batting_style, bowling_style,
@@ -162,8 +172,8 @@ const createPlayer = async (req, res, next) => {
       batting_style || 'Right-Hand',
       bowling_style ? bowling_style.trim() : null,
       team_id || null,
-      jersey_no || null,
-      is_active !== undefined ? (is_active ? 1 : 0) : 1
+      jersey_no ?? null,
+      is_active !== undefined ? toDatabaseBoolean(is_active) : 1
     ]);
 
     const [createdRows] = await pool.query(`
@@ -210,6 +220,27 @@ const updatePlayer = async (req, res, next) => {
     }
 
     const current = existing[0];
+    const finalTeamId = team_id !== undefined ? team_id : current.team_id;
+
+    if (finalTeamId !== null) {
+      const [teams] = await pool.query('SELECT team_id FROM teams WHERE team_id = ?', [finalTeamId]);
+      if (teams.length === 0) {
+        return res.status(400).json({ success: false, message: 'The selected team does not exist.' });
+      }
+    }
+
+    if (Number(finalTeamId || 0) !== Number(current.team_id || 0)) {
+      const [captainTeams] = await pool.query(
+        'SELECT team_id FROM teams WHERE captain_id = ?',
+        [id]
+      );
+      if (captainTeams.length > 0) {
+        return res.status(409).json({
+          success: false,
+          message: 'Clear or reassign this player as team captain before changing their team.'
+        });
+      }
+    }
 
     if (role && !VALID_ROLES.includes(role)) {
       return res.status(400).json({
@@ -246,9 +277,9 @@ const updatePlayer = async (req, res, next) => {
       role !== undefined ? role : current.role,
       batting_style !== undefined ? batting_style : current.batting_style,
       bowling_style !== undefined ? (bowling_style ? bowling_style.trim() : null) : current.bowling_style,
-      team_id !== undefined ? team_id : current.team_id,
+      finalTeamId,
       jersey_no !== undefined ? jersey_no : current.jersey_no,
-      is_active !== undefined ? (is_active ? 1 : 0) : current.is_active,
+      is_active !== undefined ? toDatabaseBoolean(is_active) : current.is_active,
       id
     ]);
 

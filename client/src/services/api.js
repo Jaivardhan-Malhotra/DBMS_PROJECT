@@ -15,11 +15,18 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    const message =
+    const validationDetails = error.response?.data?.errors;
+    const details = Array.isArray(validationDetails)
+      ? validationDetails
+        .map(({ field, message: detail }) => field ? `${field}: ${detail}` : detail)
+        .join('; ')
+      : '';
+    const responseMessage =
       error.response?.data?.message ||
       error.response?.data?.error ||
       error.message ||
       'An unexpected error occurred';
+    const message = details ? `${responseMessage} ${details}` : responseMessage;
     return Promise.reject(new Error(message));
   }
 );

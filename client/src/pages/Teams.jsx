@@ -19,15 +19,18 @@ import FormField from '../components/FormField';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
 import Badge from '../components/Badge';
+import { JERSEY_COLORS, getJerseyColorHex } from '../constants/teamColors';
 
 const initialForm = {
   team_name: '',
   short_name: '',
   city: '',
   home_venue_id: '',
+  captain_id: '',
   coach: '',
-  jersey_color: '#f97316',
+  jersey_color: 'Orange',
   founded_year: 2008,
+  titles_won: 0,
 };
 
 const Teams = () => {
@@ -43,6 +46,8 @@ const Teams = () => {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [teamPlayers, setTeamPlayers] = useState([]);
+  const [captainOptions, setCaptainOptions] = useState([]);
+  const [captainLoading, setCaptainLoading] = useState(false);
   const [loadingPlayers, setLoadingPlayers] = useState(false);
 
   // Form state
@@ -76,22 +81,35 @@ const Teams = () => {
   const handleOpenAdd = () => {
     setSelectedTeam(null);
     setFormData(initialForm);
+    setCaptainOptions([]);
     setFormErrors({});
     setIsFormOpen(true);
   };
 
-  const handleOpenEdit = (team) => {
+  const handleOpenEdit = async (team) => {
     setSelectedTeam(team);
     setFormData({
       team_name: team.team_name || '',
       short_name: team.short_name || '',
       city: team.city || '',
       home_venue_id: team.home_venue_id || '',
+      captain_id: team.captain_id ? String(team.captain_id) : '',
       coach: team.coach || '',
-      jersey_color: team.jersey_color || '#f97316',
+      jersey_color: team.jersey_color || 'Orange',
       founded_year: team.founded_year || 2008,
+      titles_won: team.titles_won ?? 0,
     });
     setFormErrors({});
+    setCaptainLoading(true);
+    try {
+      const response = await teamsAPI.getPlayers(team.team_id);
+      setCaptainOptions(response.data.data || []);
+    } catch (error) {
+      setCaptainOptions([]);
+      toast.error(error.message || 'Failed to load the team roster for captain selection');
+    } finally {
+      setCaptainLoading(false);
+    }
     setIsFormOpen(true);
   };
 
@@ -117,11 +135,26 @@ const Teams = () => {
   const validateForm = () => {
     const errors = {};
     if (!formData.team_name.trim()) errors.team_name = 'Team name is required';
+    else if (formData.team_name.trim().length > 150) errors.team_name = 'Team name cannot exceed 150 characters';
     if (!formData.short_name.trim()) errors.short_name = 'Short name is required';
-    else if (formData.short_name.trim().length > 10) errors.short_name = 'Short name max 10 chars';
+    else if (formData.short_name.trim().length < 2 || formData.short_name.trim().length > 10) {
+      errors.short_name = 'Short name must be between 2 and 10 characters';
+    }
     if (!formData.city.trim()) errors.city = 'City is required';
-    if (formData.founded_year && (formData.founded_year < 1900 || formData.founded_year > 2099)) {
+    else if (formData.city.trim().length > 100) errors.city = 'City cannot exceed 100 characters';
+    if (formData.coach.trim().length > 100) errors.coach = 'Coach name cannot exceed 100 characters';
+    if (!JERSEY_COLORS.some(({ name }) => name === formData.jersey_color)) {
+      errors.jersey_color = 'Choose a jersey color from the list';
+    }
+    const foundedYear = Number(formData.founded_year);
+    if (formData.founded_year && (
+      !Number.isInteger(foundedYear) || foundedYear < 1900 || foundedYear > 2100
+    )) {
       errors.founded_year = 'Enter a valid year';
+    }
+    const titlesWon = Number(formData.titles_won);
+    if (!Number.isInteger(titlesWon) || titlesWon < 0 || titlesWon > 255) {
+      errors.titles_won = 'Titles won must be a whole number between 0 and 255';
     }
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -133,21 +166,26 @@ const Teams = () => {
 
     setSubmitting(true);
     try {
+      const { captain_id, ...teamFields } = formData;
       const payload = {
-        ...formData,
+        ...teamFields,
         home_venue_id: formData.home_venue_id ? Number(formData.home_venue_id) : null,
         founded_year: formData.founded_year ? Number(formData.founded_year) : null,
+        titles_won: Number(formData.titles_won),
       };
 
       if (selectedTeam) {
-        await teamsAPI.update(selectedTeam.team_id, payload);
+        await teamsAPI.update(selectedTeam.team_id, {
+          ...payload,
+          captain_id: captain_id ? Number(captain_id) : null,
+        });
         toast.success(`Team "${formData.team_name}" updated successfully!`);
       } else {
         await teamsAPI.create(payload);
         toast.success(`Team "${formData.team_name}" created successfully!`);
       }
       setIsFormOpen(false);
-      fetchTeamsAndVenues();
+      await fetchTeamsAndVenues();
     } catch (error) {
       toast.error(error.message || 'Operation failed');
     } finally {
@@ -162,7 +200,7 @@ const Teams = () => {
       await teamsAPI.delete(selectedTeam.team_id);
       toast.success(`Team "${selectedTeam.team_name}" deleted.`);
       setIsDeleteOpen(false);
-      fetchTeamsAndVenues();
+      await fetchTeamsAndVenues();
     } catch (error) {
       toast.error(error.message || 'Failed to delete team');
     } finally {
@@ -239,7 +277,7 @@ const Teams = () => {
                 <div
                   style={{
                     height: '75px',
-                    background: `linear-gradient(135deg, ${team.jersey_color || '#1e293b'} 0%, #0f1629 100%)`,
+                    background: `linear-gradient(135deg, ${getJerseyColorHex(team.jersey_color, '#1e293b')} 0%, #0f1629 100%)`,
                     padding: '0.75rem 1.25rem',
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -265,10 +303,10 @@ const Teams = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem' }}>
                     <div
                       className="team-color-indicator"
-                      style={{ backgroundColor: team.jersey_color || '#f97316' }}
+                      style={{ backgroundColor: getJerseyColorHex(team.jersey_color) }}
                       title={`Jersey Color: ${team.jersey_color}`}
                     />
-                    <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: getJerseyColorHex(team.jersey_color) }}>
                       {team.team_name}
                     </h3>
                   </div>
@@ -285,8 +323,17 @@ const Teams = () => {
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}>
+                      <User size={15} color="var(--text-muted)" />
+                      <span>Captain: <strong style={{ color: 'var(--text-primary)' }}>{team.captain_name || 'Unassigned'}</strong></span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}>
                       <Calendar size={15} color="var(--text-muted)" />
                       <span>Founded: {team.founded_year || 'N/A'}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}>
+                      <Shield size={15} color="var(--text-muted)" />
+                      <span>Titles won: {team.titles_won ?? 0}</span>
                     </div>
 
                   </div>
@@ -348,6 +395,7 @@ const Teams = () => {
                 type="text"
                 className="form-control"
                 placeholder="e.g. Mumbai Indians"
+                maxLength={150}
                 value={formData.team_name}
                 onChange={(e) => setFormData({ ...formData, team_name: e.target.value })}
               />
@@ -357,6 +405,7 @@ const Teams = () => {
                 type="text"
                 className="form-control"
                 placeholder="e.g. MI"
+                maxLength={10}
                 value={formData.short_name}
                 onChange={(e) => setFormData({ ...formData, short_name: e.target.value.toUpperCase() })}
               />
@@ -369,6 +418,7 @@ const Teams = () => {
                 type="text"
                 className="form-control"
                 placeholder="e.g. Mumbai"
+                maxLength={100}
                 value={formData.city}
                 onChange={(e) => setFormData({ ...formData, city: e.target.value })}
               />
@@ -395,6 +445,7 @@ const Teams = () => {
                 type="text"
                 className="form-control"
                 placeholder="e.g. Mark Boucher"
+                maxLength={100}
                 value={formData.coach}
                 onChange={(e) => setFormData({ ...formData, coach: e.target.value })}
               />
@@ -404,6 +455,9 @@ const Teams = () => {
                 type="number"
                 className="form-control"
                 placeholder="2008"
+                min="1900"
+                max="2100"
+                step="1"
                 value={formData.founded_year}
                 onChange={(e) => setFormData({ ...formData, founded_year: e.target.value })}
               />
@@ -411,22 +465,43 @@ const Teams = () => {
           </div>
 
           <div className="form-row">
-            <FormField label="Jersey Color Scheme">
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <input
-                  type="color"
-                  value={formData.jersey_color}
-                  onChange={(e) => setFormData({ ...formData, jersey_color: e.target.value })}
-                  style={{ width: '45px', height: '38px', borderRadius: '6px', border: 'none', cursor: 'pointer', background: 'none' }}
-                />
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="#004BA0"
-                  value={formData.jersey_color}
-                  onChange={(e) => setFormData({ ...formData, jersey_color: e.target.value })}
-                />
-              </div>
+            <FormField label="Titles Won" error={formErrors.titles_won}>
+              <input
+                type="number"
+                className="form-control"
+                min="0"
+                max="255"
+                step="1"
+                value={formData.titles_won}
+                onChange={(e) => setFormData({ ...formData, titles_won: e.target.value })}
+              />
+            </FormField>
+            <FormField label="Jersey Color" error={formErrors.jersey_color} required>
+              <select
+                className="form-control"
+                value={formData.jersey_color}
+                onChange={(e) => setFormData({ ...formData, jersey_color: e.target.value })}
+              >
+                {JERSEY_COLORS.map(({ name, hex }) => (
+                  <option key={name} value={name} style={{ color: hex }}>{name}</option>
+                ))}
+              </select>
+            </FormField>
+            <FormField label="Team Captain">
+              <select
+                className="form-control"
+                value={formData.captain_id}
+                disabled={!selectedTeam || captainLoading}
+                onChange={(e) => setFormData({ ...formData, captain_id: e.target.value })}
+              >
+                <option value="">Unassigned</option>
+                {captainOptions.map((player) => (
+                  <option key={player.player_id} value={player.player_id}>{player.player_name}</option>
+                ))}
+              </select>
+              {!selectedTeam && (
+                <small style={{ color: 'var(--text-muted)' }}>Add players to this team, then edit it to choose a captain.</small>
+              )}
             </FormField>
           </div>
 
@@ -471,7 +546,7 @@ const Teams = () => {
                   width: '60px',
                   height: '60px',
                   borderRadius: '12px',
-                  backgroundColor: selectedTeam.jersey_color || '#f97316',
+                  backgroundColor: getJerseyColorHex(selectedTeam.jersey_color),
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -483,13 +558,16 @@ const Teams = () => {
                 {selectedTeam.short_name}
               </div>
               <div style={{ flex: 1 }}>
-                <h4 style={{ fontSize: '1.2rem', fontWeight: 700 }}>{selectedTeam.team_name}</h4>
+                <h4 style={{ fontSize: '1.2rem', fontWeight: 700, color: getJerseyColorHex(selectedTeam.jersey_color) }}>{selectedTeam.team_name}</h4>
                 <div style={{ display: 'flex', gap: '1.5rem', marginTop: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <MapPin size={13} /> {selectedTeam.city}
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <User size={13} /> Coach: {selectedTeam.coach || 'N/A'}
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <User size={13} /> Captain: {selectedTeam.captain_name || 'Unassigned'}
                   </span>
                 </div>
               </div>
@@ -522,7 +600,7 @@ const Teams = () => {
                     <tbody>
                       {teamPlayers.map((player) => (
                         <tr key={player.player_id}>
-                          <td>{player.jersey_no || '-'}</td>
+                          <td>{player.jersey_no ?? '-'}</td>
                           <td className="text-primary">{player.player_name}</td>
                           <td>
                             <Badge variant="purple" label={player.role} />
@@ -551,7 +629,7 @@ const Teams = () => {
         onClose={() => setIsDeleteOpen(false)}
         onConfirm={handleDeleteTeam}
         title="Delete Franchise"
-        message={`Are you sure you want to delete "${selectedTeam?.team_name}"? This may affect associated matches, players, and records.`}
+        message={`Permanently delete "${selectedTeam?.team_name}" and its linked matches, scorecards, innings, and match assignments? Players will be kept but unassigned; optional owner and season references will be cleared.`}
         loading={submitting}
       />
     </div>

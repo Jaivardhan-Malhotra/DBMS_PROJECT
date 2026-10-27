@@ -1,0 +1,384 @@
+IPL MANAGEMENT SYSTEM - SQL QUERIES, USES, AND LOCATIONS
+
+DATABASE SCHEMA
+
+CREATE TABLE venues (...);
+Use: Store stadium and venue information.
+Used in: database/schema.sql
+
+CREATE TABLE seasons (...);
+Use: Store IPL season years, dates, host countries, and totals.
+Used in: database/schema.sql
+
+CREATE TABLE teams (...);
+Use: Store team details, home venue, captain, jersey color, and titles.
+Used in: database/schema.sql
+
+CREATE TABLE players (...);
+Use: Store player profiles, team assignment, role, and profile statistics.
+Used in: database/schema.sql
+
+CREATE TABLE matches (...);
+Use: Store fixtures, participating teams, season, venue, and match results.
+Used in: database/schema.sql
+
+CREATE TABLE player_match (...);
+Use: Store a player's performance in a particular match.
+Used in: database/schema.sql
+
+ALTER TABLE teams
+ADD CONSTRAINT fk_team_captain
+FOREIGN KEY (captain_id) REFERENCES players(player_id)
+ON DELETE SET NULL ON UPDATE CASCADE;
+Use: Link a team captain to a player; clear the captain ID if that player is deleted.
+Used in: database/schema.sql
+
+CREATE VIEW v_match_details AS
+SELECT match_id, match_date, match_time, match_type, status,
+       season_year, venue_name, team1_name, team2_name,
+       winner_name, player_of_match_name
+FROM matches
+JOIN seasons ON matches.season_id = seasons.season_id
+JOIN venues ON matches.venue_id = venues.venue_id
+JOIN teams AS team1 ON matches.team1_id = team1.team_id
+JOIN teams AS team2 ON matches.team2_id = team2.team_id
+LEFT JOIN teams AS winner ON matches.winner_id = winner.team_id
+LEFT JOIN players ON matches.player_of_match = players.player_id;
+Use: Provide joined names and details for match displays.
+Used in: database/schema.sql; server/src/controllers/matchesController.js
+
+SEED DATA QUERIES
+
+INSERT INTO venues (venue_name, city, country, capacity, pitch_type, established_year)
+VALUES (...);
+Use: Add sample stadium records.
+Used in: database/seed.sql
+
+INSERT INTO seasons (season_year, start_date, end_date, host_country, total_teams, total_matches)
+VALUES (...);
+Use: Add sample IPL seasons.
+Used in: database/seed.sql
+
+INSERT INTO teams (team_name, short_name, city, home_venue_id, coach,
+                   jersey_color, founded_year, titles_won)
+VALUES (...);
+Use: Add sample teams.
+Used in: database/seed.sql
+
+INSERT INTO players (player_name, dob, nationality, role, batting_style,
+                     bowling_style, team_id, jersey_no, matches_played,
+                     runs_scored, wickets_taken, base_price, is_active)
+VALUES (...);
+Use: Add sample player profiles and career totals.
+Used in: database/seed.sql
+
+UPDATE teams
+JOIN players ON ...
+SET teams.captain_id = players.player_id
+WHERE ...;
+Use: Assign sample captains to teams.
+Used in: database/seed.sql
+
+INSERT INTO matches (...)
+VALUES (...);
+Use: Add sample fixtures and match results.
+Used in: database/seed.sql
+
+INSERT INTO player_match (...)
+VALUES (...);
+Use: Add sample per-match performance statistics.
+Used in: database/seed.sql
+
+TEAMS
+
+SELECT teams and LEFT JOIN venues and captain players
+WHERE team_name LIKE ? OR short_name LIKE ? OR city LIKE ?
+ORDER BY team_name;
+Use: List teams, their home venues, and captains; optionally search teams.
+Used in: GET /api/teams; teamsController.getAllTeams()
+File: server/src/controllers/teamsController.js
+
+SELECT team and LEFT JOIN venue and captain player
+WHERE team_id = ?;
+Use: Retrieve one team's details.
+Used in: GET /api/teams/:id; teamsController.getTeamById()
+File: server/src/controllers/teamsController.js
+
+SELECT team_id FROM venues WHERE venue_id = ?;
+INSERT INTO teams (team_name, short_name, city, home_venue_id, coach,
+                   jersey_color, founded_year, titles_won)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+SELECT * FROM teams WHERE team_id = ?;
+Use: Validate the selected venue, create a team, and return the new team.
+Used in: POST /api/teams; teamsController.createTeam()
+File: server/src/controllers/teamsController.js
+
+SELECT * FROM teams WHERE team_id = ?;
+SELECT venue_id FROM venues WHERE venue_id = ?;
+SELECT player_id, team_id FROM players WHERE player_id = ?;
+UPDATE teams SET team_name = ?, short_name = ?, city = ?, home_venue_id = ?,
+                 coach = ?, jersey_color = ?, founded_year = ?, titles_won = ?,
+                 captain_id = ?
+WHERE team_id = ?;
+SELECT * FROM teams WHERE team_id = ?;
+Use: Load current team values, validate venue and captain, update the team, and return it.
+Used in: PUT /api/teams/:id; teamsController.updateTeam()
+File: server/src/controllers/teamsController.js
+
+SELECT team_id, team_name FROM teams WHERE team_id = ? FOR UPDATE;
+SELECT match_id FROM matches
+WHERE team1_id = ? OR team2_id = ? OR winner_id = ? OR toss_winner_id = ?
+FOR UPDATE;
+SELECT child tables and columns FROM information_schema.key_column_usage
+WHERE referenced_table_name = 'matches';
+DELETE FROM dependent_match_tables WHERE match_id IN (...);
+DELETE FROM matches WHERE match_id IN (...);
+SELECT team foreign-key references FROM information_schema.key_column_usage;
+UPDATE nullable_team_references SET team_id = NULL WHERE team_id = ?;
+DELETE FROM nonnullable_team_references WHERE team_id = ?;
+DELETE FROM teams WHERE team_id = ?;
+Use: Delete a team and its linked match history and dependent records in a transaction.
+Used in: DELETE /api/teams/:id; teamsController.deleteTeam()
+File: server/src/controllers/teamsController.js
+
+SELECT team_id, team_name FROM teams WHERE team_id = ?;
+SELECT player_id, player_name, role, team_id FROM players
+WHERE team_id = ?
+ORDER BY role, player_name;
+Use: Verify a team and retrieve its roster.
+Used in: GET /api/teams/:id/players; teamsController.getTeamPlayers()
+File: server/src/controllers/teamsController.js
+
+PLAYERS
+
+SELECT player fields and LEFT JOIN teams
+WHERE optional team_id, role, is_active, and name/nationality search filters
+ORDER BY player_name;
+Use: List players with team display information and optional filters.
+Used in: GET /api/players; playersController.getAllPlayers()
+File: server/src/controllers/playersController.js
+
+SELECT player fields and LEFT JOIN teams
+WHERE player_id = ?;
+Use: Retrieve one player with team information.
+Used in: GET /api/players/:id; playersController.getPlayerById()
+File: server/src/controllers/playersController.js
+
+SELECT team_id FROM teams WHERE team_id = ?;
+INSERT INTO players (player_name, dob, nationality, role, batting_style,
+                     bowling_style, team_id, jersey_no, is_active)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+SELECT player fields and team details
+FROM players LEFT JOIN teams ON players.team_id = teams.team_id
+WHERE player_id = ?;
+Use: Validate optional team, create a player profile, and return it.
+Used in: POST /api/players; playersController.createPlayer()
+File: server/src/controllers/playersController.js
+
+SELECT * FROM players WHERE player_id = ?;
+SELECT team_id FROM teams WHERE team_id = ?;
+SELECT team_id FROM teams WHERE captain_id = ?;
+UPDATE players SET player_name = ?, dob = ?, nationality = ?, role = ?,
+                   batting_style = ?, bowling_style = ?, team_id = ?,
+                   jersey_no = ?, is_active = ?
+WHERE player_id = ?;
+SELECT player fields and team details
+FROM players LEFT JOIN teams ON players.team_id = teams.team_id
+WHERE player_id = ?;
+Use: Check the player and team, prevent moving a captain without reassignment, update the profile, and return it.
+Used in: PUT /api/players/:id; playersController.updatePlayer()
+File: server/src/controllers/playersController.js
+
+SELECT * FROM players WHERE player_id = ?;
+UPDATE matches SET player_of_match = NULL WHERE player_of_match = ?;
+DELETE FROM player_match WHERE player_id = ?;
+DELETE FROM players WHERE player_id = ?;
+Use: Clear match references and delete a player's performance rows and profile in one transaction.
+Used in: DELETE /api/players/:id; playersController.deletePlayer()
+File: server/src/controllers/playersController.js
+
+MATCHES
+
+SELECT match summaries FROM v_match_details
+JOIN matches ON v_match_details.match_id = matches.match_id
+WHERE optional season_id, participating team_id, status, and venue_id filters
+ORDER BY match_date DESC, match_id DESC;
+Use: List matches with optional filters and joined venue/team names.
+Used in: GET /api/matches; matchesController.getAllMatches()
+File: server/src/controllers/matchesController.js
+
+SELECT match summary FROM v_match_details
+JOIN matches ON v_match_details.match_id = matches.match_id
+WHERE v_match_details.match_id = ?;
+Use: Retrieve one match with joined details.
+Used in: GET /api/matches/:id; matchesController.getMatchById()
+File: server/src/controllers/matchesController.js
+
+SELECT season_id FROM seasons WHERE season_id = ?;
+SELECT venue_id FROM venues WHERE venue_id = ?;
+SELECT team_id FROM teams WHERE team_id = ?;
+INSERT INTO matches (season_id, venue_id, team1_id, team2_id, match_date,
+                     match_time, match_type, status)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+SELECT match summary FROM v_match_details
+JOIN matches ON v_match_details.match_id = matches.match_id
+WHERE v_match_details.match_id = ?;
+Use: Validate season, venue, and two distinct teams; create a match; return its joined details.
+Used in: POST /api/matches; matchesController.createMatch()
+File: server/src/controllers/matchesController.js
+
+SELECT * FROM matches WHERE match_id = ?;
+SELECT counts for season, venue, team1, and team2 existence;
+SELECT id FROM player_match
+WHERE match_id = ? AND team_id NOT IN (?, ?)
+LIMIT 1;
+UPDATE matches SET season_id = ?, venue_id = ?, team1_id = ?, team2_id = ?,
+                   match_date = ?, match_time = ?, status = ?
+WHERE match_id = ?;
+SELECT match summary FROM v_match_details
+JOIN matches ON v_match_details.match_id = matches.match_id
+WHERE v_match_details.match_id = ?;
+Use: Validate updated references and existing performance associations, update a fixture, and return it.
+Used in: PUT /api/matches/:id; matchesController.updateMatch()
+File: server/src/controllers/matchesController.js
+
+SELECT * FROM matches WHERE match_id = ?;
+DELETE FROM player_match WHERE match_id = ?;
+DELETE FROM matches WHERE match_id = ?;
+Use: Delete a match and its performance records in one transaction.
+Used in: DELETE /api/matches/:id; matchesController.deleteMatch()
+File: server/src/controllers/matchesController.js
+
+PLAYER STATISTICS
+
+SELECT player and team details,
+       COUNT(player_match.id), COUNT(DISTINCT player_match.match_id),
+       SUM(player_match.runs_scored), SUM(player_match.wickets_taken),
+       SUM(player_match.balls_faced), SUM(player_match.is_out),
+       player profile totals
+FROM players
+LEFT JOIN teams ON teams.team_id = players.team_id
+LEFT JOIN player_match ON player_match.player_id = players.player_id
+GROUP BY player;
+Use: Calculate career totals and batting metrics from match records, using profile totals when there are no recorded match rows.
+Used in: GET /api/player-statistics; playerStatisticsController.getPlayerStatistics()
+File: server/src/controllers/playerStatisticsController.js
+
+SELECT performance record, player name, team name, match date, and opponent names
+FROM player_match
+JOIN players, teams, matches, and the two participating teams
+ORDER BY match_date DESC, player_match.id DESC;
+Use: List player performances match by match.
+Used in: GET /api/player-statistics/records; playerStatisticsController.getMatchRecords()
+File: server/src/controllers/playerStatisticsController.js
+
+SELECT match_id FROM matches
+WHERE match_id = ? AND (team1_id = ? OR team2_id = ?);
+SELECT player_id, team_id FROM players WHERE player_id = ?;
+INSERT INTO player_match (match_id, player_id, team_id, runs_scored,
+                          balls_faced, wickets_taken, is_out)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+SELECT * FROM player_match WHERE id = ?;
+Use: Validate match/team/player relationships, add a match performance record, and return it.
+Used in: POST /api/player-statistics/records; playerStatisticsController.createMatchRecord()
+File: server/src/controllers/playerStatisticsController.js
+
+SELECT * FROM player_match WHERE id = ?;
+SELECT match_id FROM matches
+WHERE match_id = ? AND (team1_id = ? OR team2_id = ?);
+SELECT player_id, team_id FROM players WHERE player_id = ?;
+UPDATE player_match SET match_id = ?, player_id = ?, team_id = ?,
+                        runs_scored = ?, balls_faced = ?, wickets_taken = ?,
+                        is_out = ?
+WHERE id = ?;
+SELECT * FROM player_match WHERE id = ?;
+Use: Validate associations, update a match performance record, and return it.
+Used in: PUT /api/player-statistics/records/:id; playerStatisticsController.updateMatchRecord()
+File: server/src/controllers/playerStatisticsController.js
+
+DELETE FROM player_match WHERE id = ?;
+Use: Delete one match-performance record.
+Used in: DELETE /api/player-statistics/records/:id; playerStatisticsController.deleteMatchRecord()
+File: server/src/controllers/playerStatisticsController.js
+
+TEAM STANDINGS
+
+SELECT season_id, season_year FROM seasons WHERE season_id = ?;
+SELECT season_id, season_year FROM seasons
+WHERE season_year = (SELECT MAX(season_year) FROM seasons);
+Use: Select a requested season or the latest season when no ID is supplied.
+Used in: GET /api/team-statistics; teamStatisticsController.getTeamStatistics()
+File: server/src/controllers/teamStatisticsController.js
+
+SELECT each team and counts of matches played, wins, losses, and no-results
+FROM teams
+with correlated COUNT(*) subqueries over matches for the selected season
+ORDER BY team_name;
+Use: Calculate season standings; the controller derives points, win percentage, and position.
+Used in: GET /api/team-statistics; teamStatisticsController.getTeamStatistics()
+File: server/src/controllers/teamStatisticsController.js
+
+SEASONS AND VENUES (MOUNTED LIST QUERIES)
+
+SELECT season_id, season_year FROM seasons ORDER BY season_year DESC;
+Use: List available seasons.
+Used in: GET /api/seasons; seasonsController.getAllSeasons()
+File: server/src/controllers/seasonsController.js
+
+SELECT venue_id, venue_name, city FROM venues ORDER BY venue_name;
+Use: List available venues.
+Used in: GET /api/venues; venuesController.getAllVenues()
+File: server/src/controllers/venuesController.js
+
+TEAM DATA MIGRATION
+
+SELECT table_name FROM information_schema.tables
+WHERE table_schema = DATABASE() AND table_name IN ('teams', 'players');
+SELECT column_name FROM information_schema.columns
+WHERE table_schema = DATABASE() AND table_name = 'teams'
+AND column_name = 'captain_id';
+ALTER TABLE teams ADD COLUMN captain_id INT NULL;
+SELECT constraint_name FROM information_schema.key_column_usage
+WHERE ... referenced_table_name = 'players';
+ALTER TABLE teams ADD CONSTRAINT fk_team_captain
+FOREIGN KEY (captain_id) REFERENCES players(player_id)
+ON DELETE SET NULL ON UPDATE CASCADE;
+SELECT team_id, jersey_color FROM teams;
+UPDATE teams SET jersey_color = ? WHERE team_id = ?;
+ALTER TABLE teams ADD CONSTRAINT chk_teams_jersey_color
+CHECK (jersey_color IS NULL OR jersey_color IN (...));
+Use: Inspect schema, add captain support if missing, convert old jersey colors to named colors, and enforce valid colors.
+Used in: server/scripts/migrateTeamData.js
+
+ADDITIONAL CONTROLLER QUERIES NOT MOUNTED IN THE ACTIVE API
+
+SELECT counts from teams, players, matches, seasons, venues, umpires, sponsors;
+SELECT recent completed/live matches;
+SELECT upcoming scheduled matches;
+SELECT teams and completed-match win counts for top-team ranking;
+Use: Dashboard totals, recent/upcoming fixtures, and top teams.
+Used in: server/src/controllers/dashboardController.js (no mounted dashboard route in server/src/routes/index.js)
+
+SELECT, INSERT, UPDATE, and DELETE queries for awards.
+Use: Award record operations.
+Used in: server/src/controllers/awardsController.js (route not mounted)
+
+SELECT, INSERT, UPDATE, and DELETE queries for innings.
+Use: Innings and innings-score operations.
+Used in: server/src/controllers/inningsController.js (route not mounted)
+
+SELECT, INSERT, UPDATE, and DELETE queries for owners.
+Use: Team ownership operations.
+Used in: server/src/controllers/ownersController.js (route not mounted)
+
+SELECT, INSERT, UPDATE, and DELETE queries for sponsors.
+Use: Sponsor operations.
+Used in: server/src/controllers/sponsorsController.js (route not mounted)
+
+SELECT, INSERT, UPDATE, and DELETE queries for umpires.
+Use: Umpire operations.
+Used in: server/src/controllers/umpiresController.js (route not mounted)
+
+SELECT queries for reports.
+Use: Report data retrieval.
+Used in: server/src/controllers/reportsController.js (route not mounted)

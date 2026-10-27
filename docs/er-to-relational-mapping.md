@@ -8,7 +8,7 @@ The database schema contains only tables used by the currently mounted applicati
 |---|---|---|
 | `venues` | Stadium details used when scheduling matches | `venue_id` |
 | `seasons` | Season year, date range, and competition totals | `season_id` |
-| `teams` | IPL team details and home venue | `team_id` |
+| `teams` | IPL team details, home venue, captain, and named jersey color | `team_id` |
 | `players` | Player profile, team assignment, and career totals | `player_id` |
 | `matches` | Match schedule and result details | `match_id` |
 | `player_match` | A player's performance record for one match | `id` |
@@ -16,6 +16,7 @@ The database schema contains only tables used by the currently mounted applicati
 ## Relationships
 
 - `teams.home_venue_id` references `venues.venue_id`.
+- `teams.captain_id` references `players.player_id`; the API only allows a player assigned to that team to be its captain.
 - `players.team_id` references `teams.team_id`; a player can be unassigned.
 - `matches.season_id` references `seasons.season_id`.
 - `matches.venue_id` references `venues.venue_id`.
@@ -26,6 +27,6 @@ The database schema contains only tables used by the currently mounted applicati
 
 ## Integrity constraints and view
 
-The tables use `PRIMARY KEY`, `FOREIGN KEY`, `UNIQUE`, `NOT NULL`, and `CHECK` constraints for identity, relationships, uniqueness, required values, and valid domain values. `v_match_details` joins matches with seasons, venues, participating teams, the winner, and player of the match for the schedule endpoints.
+The tables use `PRIMARY KEY`, `FOREIGN KEY`, `UNIQUE`, `NOT NULL`, and `CHECK` constraints for identity, relationships, uniqueness, required values, and valid domain values. Jersey colors are stored as names from the shared palette. `v_match_details` joins matches with seasons, venues, participating teams, the winner, and player of the match for the schedule endpoints.
 
 Primary keys use MySQL `AUTO_INCREMENT` because the API create operations rely on database-generated IDs. The schema otherwise uses the course-listed SQL data types and concepts.

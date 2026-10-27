@@ -18,6 +18,7 @@ import StatCard from '../components/StatCard';
 import Badge from '../components/Badge';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
+import { getJerseyColorHex } from '../constants/teamColors';
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
@@ -258,7 +259,9 @@ const Dashboard = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
                       <span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>#{idx + 1}</span>
-                        {team.team_name} ({team.short_name})
+                        <span style={{ color: getJerseyColorHex(team.jersey_color) }}>
+                          {team.team_name} ({team.short_name})
+                        </span>
                       </span>
                       <span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>
                         {wins} Wins

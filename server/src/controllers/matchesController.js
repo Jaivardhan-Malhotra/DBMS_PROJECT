@@ -223,12 +223,31 @@ const updateMatch = async (req, res, next) => {
     const current = existing[0];
     const finalTeam1 = team1_id !== undefined ? team1_id : current.team1_id;
     const finalTeam2 = team2_id !== undefined ? team2_id : current.team2_id;
+    const finalSeason = season_id !== undefined ? season_id : current.season_id;
+    const finalVenue = venue_id !== undefined ? venue_id : current.venue_id;
 
     if (Number(finalTeam1) === Number(finalTeam2)) {
       return res.status(400).json({
         success: false,
         message: 'team1_id and team2_id cannot be the same team'
       });
+    }
+
+    const [references] = await pool.query(`
+      SELECT
+        (SELECT COUNT(*) FROM seasons WHERE season_id = ?) AS season_exists,
+        (SELECT COUNT(*) FROM venues WHERE venue_id = ?) AS venue_exists,
+        (SELECT COUNT(*) FROM teams WHERE team_id = ?) AS team1_exists,
+        (SELECT COUNT(*) FROM teams WHERE team_id = ?) AS team2_exists
+    `, [finalSeason, finalVenue, finalTeam1, finalTeam2]);
+    if (!Number(references[0].season_exists)) {
+      return res.status(400).json({ success: false, message: 'The selected season does not exist.' });
+    }
+    if (!Number(references[0].venue_exists)) {
+      return res.status(400).json({ success: false, message: 'The selected venue does not exist.' });
+    }
+    if (!Number(references[0].team1_exists) || !Number(references[0].team2_exists)) {
+      return res.status(400).json({ success: false, message: 'One or both selected teams do not exist.' });
     }
 
     const [unmatchedRecords] = await pool.query(`
@@ -257,8 +276,8 @@ const updateMatch = async (req, res, next) => {
     `;
 
     await pool.query(updateQuery, [
-      season_id !== undefined ? season_id : current.season_id,
-      venue_id !== undefined ? venue_id : current.venue_id,
+      finalSeason,
+      finalVenue,
       finalTeam1,
       finalTeam2,
       match_date !== undefined ? match_date : current.match_date,
